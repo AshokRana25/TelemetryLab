@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f7f9">
+  <title>TelemetryLab — Checkout, under the microscope</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="TelemetryLab home"><span class="brand-mark">T<span>·</span></span>TelemetryLab</a>
+    <div class="workspace-label">OBSERVABILITY WORKSPACE</div>
+    <a class="nav active" href="/" aria-current="page"><span>◉</span> Checkout lab <span class="nav-number">01</span></a>
+    <a class="nav dashboard-link" href="#" target="_blank" rel="noopener"><span>▦</span> Grafana dashboard <span class="outbound">↗</span></a>
+    <a class="nav" href="/docs" target="_blank" rel="noopener"><span>⌘</span> API reference <span class="outbound">↗</span></a>
+    <div class="sidebar-bottom">
+      <div class="workspace-label">FOLLOW THE SIGNAL</div>
+      <div class="flow"><i></i><div>Order service<small>FastAPI · checkout</small></div></div>
+      <div class="flow connector"><i></i><div>Inventory service<small>HTTP · W3C trace context</small></div></div>
+      <div class="flow connector"><i class="blue"></i><div>OpenTelemetry<small>Traces + metrics + logs</small></div></div>
+      <p class="local-note">LOCAL LAB <span>v1.0</span><br><small>Synthetic orders. Real telemetry.</small></p>
+    </div>
+  </aside>
+  <div class="page">
+    <header class="topbar"><div>Workspace <span>/</span> <strong>Checkout lab</strong></div><span id="connection" class="status-pill">Connecting…</span></header>
+    <main>
+      <div class="intro"><div><div class="eyebrow">A SMALL CHECKOUT. THE WHOLE PICTURE.</div><h1>Make a request.<br>Follow the evidence.</h1><p>See how a single checkout connects distributed traces,<br class="desktop"> service metrics, and the logs that explain what happened.</p></div><a class="button secondary dashboard-link" href="#" target="_blank" rel="noopener">Open Grafana <span>↗</span></a></div>
+      <div class="signal-strip"><div><span class="signal-icon">⌁</span><strong>Traces</strong><span>Where did the time go?</span></div><div><span class="signal-icon">▥</span><strong>Metrics</strong><span>How often does it happen?</span></div><div><span class="signal-icon">≡</span><strong>Logs</strong><span>What happened inside?</span></div></div>
+      <div class="lab-grid">
+        <section class="panel checkout"><div class="panel-heading"><h2><span class="step">01</span> Build a checkout</h2><span class="tag">DEMO STORE</span></div>
+          <label class="field-label" for="product">Choose a product</label><select id="product" disabled><option>Loading products…</option></select>
+          <div class="product-preview"><div class="product-art" aria-hidden="true"><svg viewBox="0 0 120 100" fill="none"><path d="M32 23h48v50c0 10-9 14-24 14S32 83 32 73V23Z" fill="#fdfdff" stroke="#9eadd6" stroke-width="2"/><path d="M80 33h8c17 0 17 29 0 29h-8" stroke="#9eadd6" stroke-width="6"/><ellipse cx="56" cy="23" rx="24" ry="6" fill="#dce5fc" stroke="#9eadd6" stroke-width="2"/><path d="m43 57 8-10 8 17 9-15" stroke="#315ce8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><strong id="product-name">Demo catalog</strong><p id="product-description">Synthetic stock · no payment</p><b id="product-price">—</b></div><label class="quantity-label" for="quantity">Qty<input type="number" id="quantity" value="1" min="1" max="10" step="1"></label></div>
+          <fieldset id="scenarios"><legend class="field-label">Choose a scenario</legend>
+            <label class="scenario"><input type="radio" name="scenario" value="normal" checked><span class="scenario-icon normal">✓</span><span><strong>Healthy checkout</strong><small>A normal request across both services</small></span><span class="scenario-time">BASELINE</span></label>
+            <label class="scenario"><input type="radio" name="scenario" value="slow"><span class="scenario-icon slow">◷</span><span><strong>Slow inventory</strong><small id="slow-description">Add a deterministic inventory delay</small></span><span class="scenario-time">LATENCY</span></label>
+            <label class="scenario"><input type="radio" name="scenario" value="failure"><span class="scenario-icon failure">!</span><span><strong>Inventory failure</strong><small>Inventory returns 503; checkout returns 502</small></span><span class="scenario-time">ERROR</span></label>
+          </fieldset>
+          <button id="place-order" class="button primary" disabled>Place demo order <span>→</span></button>
+          <div class="burst-row"><button id="burst" class="text-button" disabled>▥ Run a traffic burst</button><span>12 requests · max 3 at once</span></div>
+          <button id="reset" class="text-button reset" disabled>↺ Return to normal behavior</button>
+          <p class="fine-print" id="demo-note">Faults apply only to this request. Synthetic orders; no payments.</p>
+        </section>
+        <section class="panel result"><div class="panel-heading"><h2><span class="step">02</span> Inspect the result</h2><span id="result-badge" class="tag">READY</span></div>
+          <div id="result-empty" class="empty-state"><div class="empty-orbit"><span>⌁</span></div><h3>Your next request starts here</h3><p>Place an order to see its status, elapsed time,<br>and a trace connecting both services.</p><span class="empty-caption">ONE REQUEST. THREE SIGNALS.</span></div>
+          <div id="result-content" hidden aria-live="polite"><div class="result-symbol" id="result-symbol">✓</div><h3 id="result-title"></h3><p id="result-message"></p><div class="result-stats"><div><small>HTTP STATUS</small><strong id="http-status">—</strong></div><div><small>SERVER ELAPSED</small><strong id="elapsed">—</strong></div></div><div class="trace-box"><small>TRACE ID</small><code id="trace-id"></code><a id="trace-link" class="button secondary" target="_blank" rel="noopener">Inspect trace in Grafana <span>↗</span></a></div><p class="fine-print">Telemetry exports asynchronously. Allow 5–15 seconds for all signals to appear.</p></div>
+          <div class="result-footer"><span class="live-dot"></span><span id="activity" role="status">Waiting for your first request</span></div>
+        </section>
+      </div>
+      <section class="panel history"><div class="panel-heading"><h2>Request activity</h2><span class="muted">Latest 20 · this browser session</span></div><div class="table-scroll"><table><thead><tr><th>TIME</th><th>SCENARIO</th><th>RESULT</th><th>ELAPSED</th><th>TRACE</th></tr></thead><tbody id="history"><tr id="history-empty"><td colspan="5">No requests yet. Start with a healthy checkout above.</td></tr></tbody></table></div></section>
+      <footer>Built to make observability understandable.<span>FastAPI <i>·</i> OpenTelemetry <i>·</i> Grafana</span></footer>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,44 @@
+name: Checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  application:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: 0.9.13
+      - run: uv sync --frozen --python 3.13
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest -q
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.21.1
+      - run: node --test tests/ui.test.cjs
+      - run: docker compose config --quiet
+  end-to-end:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose up --build -d --wait --wait-timeout 240
+      - name: Verify traces, logs, metrics, dashboards, and recovery
+        run: docker compose exec -T order python scripts/smoke.py --order-url http://order:8080 --grafana-url http://grafana:3000
+      - name: Collect diagnostics
+        if: always()
+        run: |
+          mkdir -p artifacts
+          docker compose ps -a > artifacts/compose-ps.txt
+          docker compose logs --no-color > artifacts/compose.log
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: compose-diagnostics
+          path: artifacts/
+      - run: docker compose down --volumes
+        if: always()

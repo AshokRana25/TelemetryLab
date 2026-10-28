@@ -1,0 +1,140 @@
+name: telemetrylab
+
+x-app-env: &app-env
+  DEMO_ENABLED: ${DEMO_ENABLED:-true}
+  DEMO_SLOW_SECONDS: ${DEMO_SLOW_SECONDS:-1.5}
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  DEPLOYMENT_ENVIRONMENT: local
+  SERVICE_VERSION: 1.0.0
+  GRAFANA_PUBLIC_URL: ${GRAFANA_PUBLIC_URL:-http://localhost:3000}
+
+x-health: &health
+  interval: 10s
+  timeout: 3s
+  retries: 12
+  start_period: 20s
+
+services:
+  order:
+    build: .
+    environment:
+      <<: *app-env
+      INVENTORY_URL: http://inventory:8081
+      INVENTORY_TIMEOUT_SECONDS: ${INVENTORY_TIMEOUT_SECONDS:-3.0}
+    ports: ["127.0.0.1:${ORDER_PORT:-8080}:8080"]
+    depends_on:
+      inventory: {condition: service_healthy}
+      otel-collector: {condition: service_healthy}
+    healthcheck:
+      <<: *health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz', timeout=2)"]
+    mem_limit: 256m
+    restart: unless-stopped
+
+  inventory:
+    build: .
+    command: ["uvicorn", "services.inventory.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8081", "--no-access-log"]
+    environment: *app-env
+    depends_on:
+      otel-collector: {condition: service_healthy}
+    healthcheck:
+      <<: *health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/healthz', timeout=2)"]
+    mem_limit: 256m
+    restart: unless-stopped
+
+  otel-collector:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.probe
+      args: {BASE_IMAGE: "otel/opentelemetry-collector-contrib:0.140.0"}
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes: ["./infra/otel-collector.yaml:/etc/otelcol/config.yaml:ro"]
+    depends_on:
+      tempo: {condition: service_started}
+      loki: {condition: service_started}
+    healthcheck:
+      <<: *health
+      test: ["CMD", "/healthcheck", "http://localhost:13133/"]
+    mem_limit: 384m
+    restart: unless-stopped
+
+  tempo:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.probe
+      args: {BASE_IMAGE: "grafana/tempo:2.9.0"}
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./infra/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    healthcheck:
+      <<: *health
+      test: ["CMD", "/healthcheck", "http://localhost:3200/ready"]
+    mem_limit: 512m
+    restart: unless-stopped
+
+  loki:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.probe
+      args: {BASE_IMAGE: "grafana/loki:3.6.2"}
+    command: ["-config.file=/etc/loki/config.yaml"]
+    volumes:
+      - ./infra/loki.yaml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
+    healthcheck:
+      <<: *health
+      test: ["CMD", "/healthcheck", "http://localhost:3100/ready"]
+    mem_limit: 512m
+    restart: unless-stopped
+
+  prometheus:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.probe
+      args: {BASE_IMAGE: "prom/prometheus:v3.7.3"}
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=24h", "--storage.tsdb.retention.size=512MB", "--enable-feature=exemplar-storage"]
+    volumes:
+      - ./infra/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    healthcheck:
+      <<: *health
+      test: ["CMD", "/healthcheck", "http://localhost:9090/-/ready"]
+    mem_limit: 512m
+    restart: unless-stopped
+
+  grafana:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.probe
+      args: {BASE_IMAGE: "grafana/grafana:12.3.1"}
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-telemetrylab}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_USERS_DEFAULT_THEME: light
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/telemetrylab.json
+    ports: ["127.0.0.1:${GRAFANA_PORT:-3000}:3000"]
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      tempo: {condition: service_healthy}
+      loki: {condition: service_healthy}
+      prometheus: {condition: service_healthy}
+    healthcheck:
+      <<: *health
+      test: ["CMD", "/healthcheck", "http://localhost:3000/api/health"]
+    mem_limit: 512m
+    restart: unless-stopped
+
+volumes:
+  tempo-data:
+  loki-data:
+  prometheus-data:
+  grafana-data:
